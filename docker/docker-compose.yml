@@ -1,0 +1,88 @@
+# =============================================================================
+# docker-compose.yml — Multi-Service Deployment
+# =============================================================================
+# WHY DOCKER COMPOSE?
+#   We have 2 services: backend (FastAPI) + frontend (Streamlit).
+#   Docker Compose starts, networks, and manages them all with one command:
+#     docker-compose up --build
+#
+# SERVICES:
+#   - backend:  FastAPI app on port 8000
+#   - frontend: Streamlit app on port 8501
+#
+# VOLUMES:
+#   - ./data/uploads: PDF uploads (persisted across restarts)
+#   - ./vector_store: ChromaDB data (persisted across restarts)
+#
+# NETWORKING:
+#   Both services join the "rag-network" bridge network.
+#   The frontend calls the backend at http://backend:8000 (not localhost!)
+#   WHY? Inside Docker Compose, services communicate by service name.
+#
+# PRODUCTION NOTES:
+#   - Add nginx as a reverse proxy for HTTPS and load balancing
+#   - Move secrets to Docker Secrets or a vault
+#   - Use named volumes instead of bind mounts for better performance
+
+version: "3.9"
+
+services:
+  # ── Backend: FastAPI RAG API ────────────────────────────────────────────────
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: rag-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - CHROMA_PERSIST_DIR=/app/vector_store
+      - UPLOAD_DIR=/app/data/uploads
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG=${DEBUG:-false}
+    volumes:
+      # Persist uploaded PDFs and vector store across container restarts
+      - ../data/uploads:/app/data/uploads
+      - ../vector_store:/app/vector_store
+      # Mount prompts so they can be edited without rebuilding
+      - ../prompts:/app/prompts
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s  # Give time for model loading
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+  # ── Frontend: Streamlit UI ─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: rag-frontend
+    ports:
+      - "8501:8501"
+    environment:
+      # Frontend talks to backend via Docker Compose service name
+      - API_BASE_URL=http://backend:8000/api/v1
+    depends_on:
+      backend:
+        condition: service_healthy  # Wait for backend to be healthy
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+networks:
+  rag-network:
+    driver: bridge
+
+volumes:
+  uploads:
+    driver: local
+  vector_store:
+    driver: local

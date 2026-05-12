@@ -1,0 +1,18 @@
+Answer the user's question based on the following retrieved context from a seminar report.
+
+=== RETRIEVED CONTEXT ===
+{context}
+=== END OF CONTEXT ===
+
+QUESTION: {question}
+
+INSTRUCTIONS:
+1. Answer using ONLY the information in the retrieved context above.
+2. Structure your answer clearly with paragraphs.
+3. After each key claim, cite its source in this exact format: [Source: {source_name}, Page {{page_number}}]
+4. If different parts of the context support different aspects of the answer, cite each separately.
+5. If the question cannot be answered from the context, clearly state this.
+6. Do not repeat the question in your answer.
+7. Write at the level of an academic technical report.
+
+ANSWER:

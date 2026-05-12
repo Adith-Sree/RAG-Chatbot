@@ -1,0 +1,71 @@
+# =============================================================================
+# Dockerfile.backend — FastAPI Backend Container
+# =============================================================================
+# WHY MULTI-STAGE BUILD?
+#   Stage 1 (builder): Installs all build dependencies (gcc, etc.)
+#   Stage 2 (final): Copies only the installed packages — no build tools
+#   Result: Much smaller final image (~30% smaller than single-stage)
+#
+# WHY python:3.11-slim?
+#   - slim = no unnecessary packages (no compilers, docs, etc.)
+#   - 3.11 = latest stable, significant performance improvements over 3.10
+#   - Base image: ~150MB vs ~900MB for the full python image
+#
+# PRODUCTION CONSIDERATION:
+#   Pin exact base image digest for reproducibility:
+#   FROM python:3.11-slim@sha256:abc123...
+
+FROM python:3.11-slim AS builder
+
+# Install build dependencies needed to compile some Python packages
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy requirements first (layer caching optimization)
+# WHY? If requirements.txt doesn't change, Docker reuses the cached layer
+# instead of reinstalling all packages. This saves minutes on each rebuild.
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# =============================================================================
+FROM python:3.11-slim AS final
+
+# Create non-root user for security
+# WHY? Running as root inside a container is a security risk.
+# If the container is compromised, the attacker has root access.
+RUN groupadd -r raguser && useradd -r -g raguser raguser
+
+# Copy installed packages from builder stage
+COPY --from=builder /install /usr/local
+
+WORKDIR /app
+
+# Copy application code
+COPY . .
+
+# Create required directories with proper ownership
+RUN mkdir -p data/uploads vector_store && \
+    chown -R raguser:raguser /app
+
+# Switch to non-root user
+USER raguser
+
+# Expose the FastAPI port
+EXPOSE 8000
+
+# Health check: Docker will restart the container if this fails
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8000/api/v1/health')"
+
+# WHY Uvicorn with --host 0.0.0.0?
+#   Inside Docker, the app must listen on all interfaces (0.0.0.0)
+#   not just localhost, so the Docker port mapping works.
+# WHY --workers 1?
+#   Single worker for development. For production:
+#   Use gunicorn: gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

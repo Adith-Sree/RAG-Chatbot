@@ -1,0 +1,19 @@
+Based on your answer above, extract all citations in a structured format.
+
+For each unique source you cited, provide:
+- The source document name
+- The specific page number(s) referenced
+- A brief quote or description of what was cited
+
+Format your response as a JSON array:
+[
+  {
+    "source": "document_name.pdf",
+    "page_number": 5,
+    "excerpt": "brief excerpt or description of the cited content"
+  }
+]
+
+If no citations were made, return an empty array: []
+
+CITATIONS:

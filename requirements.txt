@@ -1,0 +1,60 @@
+# =============================================================================
+# requirements.txt — Python Dependencies
+# =============================================================================
+# PINNING STRATEGY:
+#   Core packages are pinned to avoid breaking changes.
+#   Transitive dependencies (tenacity, anyio, etc.) are left unpinned
+#   so pip can resolve conflicts automatically.
+#
+# PRODUCTION: Use pip-compile to generate a fully-locked file:
+#   pip install pip-tools && pip-compile requirements.in
+
+# ── Web Framework ──────────────────────────────────────────────────────────────
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+python-multipart==0.0.9        # Required for FastAPI file uploads
+
+# ── LangChain (RAG Framework) ─────────────────────────────────────────────────
+langchain==0.3.0
+langchain-openai==0.2.0        # Used with Google's OpenAI-compat endpoint
+langchain-community==0.3.0
+langchain-experimental==0.3.0  # For SemanticChunker
+langchain-core==0.3.0
+
+# ── LLM & Embeddings ──────────────────────────────────────────────────────────
+# Google Gemini via OpenAI-compatible SDK (no langchain-google-genai needed)
+openai>=1.0.0                  # OpenAI SDK, pointed at Google's compat endpoint
+tiktoken==0.7.0                # Token counting
+
+# ── PDF Parsing ───────────────────────────────────────────────────────────────
+PyMuPDF==1.24.0                # Fast PDF parser (fitz)
+pdfplumber==0.11.0             # Alternative parser for complex layouts
+
+# ── Vector Database ───────────────────────────────────────────────────────────
+chromadb==0.5.0
+
+# ── Reranking ─────────────────────────────────────────────────────────────────
+sentence-transformers==3.0.0   # Cross-encoder for reranking
+# torch is already installed separately; do NOT pin it here.
+# Run: pip install torch==2.4.0  (or let sentence-transformers pull a compatible version)
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+pydantic==2.8.0
+pydantic-settings==2.4.0       # .env file loading
+
+# ── Resilience ────────────────────────────────────────────────────────────────
+# tenacity is NOT pinned here — langchain 0.3 requires tenacity<9.0.0
+# so let pip resolve it automatically (it will pick 8.5.x)
+tenacity>=8.1.0,<9.0.0
+
+# ── Frontend ──────────────────────────────────────────────────────────────────
+streamlit==1.38.0
+requests==2.32.0
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest==8.3.0
+pytest-asyncio==0.23.0
+httpx==0.27.0                  # Async HTTP client (for TestClient)
+
+# ── Development Utilities ─────────────────────────────────────────────────────
+python-dotenv==1.0.0           # .env loading for development
