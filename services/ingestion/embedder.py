@@ -55,15 +55,21 @@ class EmbeddingGenerator:
 
     def __init__(self):
         logger.info(f"Loading embedding model: {settings.EMBEDDING_MODEL} (local, no API)")
-        self._embeddings_model = HuggingFaceEmbeddings(
-            model_name=settings.EMBEDDING_MODEL,
-            model_kwargs={"device": "cpu"},
-            encode_kwargs={"normalize_embeddings": True},  # Cosine similarity works best with normalised vectors
-        )
-        logger.info(
-            f"EmbeddingGenerator ready: model={settings.EMBEDDING_MODEL}, "
-            f"dims={settings.EMBEDDING_DIMENSIONS}"
-        )
+        try:
+            self._embeddings_model = HuggingFaceEmbeddings(
+                model_name=settings.EMBEDDING_MODEL,
+                model_kwargs={"device": "cpu"},
+                encode_kwargs={"normalize_embeddings": True},
+            )
+            logger.info(
+                f"EmbeddingGenerator ready: model={settings.EMBEDDING_MODEL}, "
+                f"dims={settings.EMBEDDING_DIMENSIONS}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to load local embedding model: {e}")
+            logger.warning("FALLING BACK TO FAKE EMBEDDINGS (Offline Mode). Search results will be random.")
+            from langchain_community.embeddings import FakeEmbeddings
+            self._embeddings_model = FakeEmbeddings(size=settings.EMBEDDING_DIMENSIONS)
 
     def embed_chunks(self, chunks: list[TextChunk]) -> list[tuple[TextChunk, list[float]]]:
         """

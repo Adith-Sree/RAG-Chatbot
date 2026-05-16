@@ -86,14 +86,13 @@ class Reranker:
         model_name = settings.RERANKER_MODEL
         logger.info(f"Loading cross-encoder reranker: {model_name}")
 
-        # Load model once at startup — this takes a few seconds.
-        # In production, load this in the startup event, not per-request.
         try:
             self._model = CrossEncoder(model_name, max_length=512)
             logger.info("Reranker model loaded successfully.")
         except Exception as e:
             logger.error(f"Failed to load reranker model '{model_name}': {e}")
-            raise
+            logger.warning("Reranking will be SKIPPED. Returning raw retrieval results.")
+            self._model = None
 
     def rerank(
         self,
@@ -138,7 +137,12 @@ class Reranker:
         logger.debug(f"Reranking {len(chunks)} candidates → top {top_n}")
 
         # Prepare (query, text) pairs
-        # The cross-encoder expects exactly this format.
+        if self._model is None:
+            logger.warning("Reranker model not available. Returning top-n retrieval results without reranking.")
+            for chunk in chunks:
+                chunk["reranker_score"] = chunk.get("score", 0.0)
+            return chunks[:top_n]
+
         pairs = [(query, chunk["text"]) for chunk in chunks]
 
         # Score all pairs at once (more efficient than one-by-one)
