@@ -162,5 +162,20 @@ class TestHealthEndpoint:
         response = client.get("/api/v1/health")
         assert response.status_code == 200
         data = response.json()
-        assert "status" in data
-        assert "checks" in data
+        assert data["status"] == "healthy"
+        assert data["checks"]["api"] == "ok"
+        assert data["checks"]["google_api_key"] == "configured"
+        assert data["checks"]["vector_store"] == "ok"
+
+    def test_health_check_degraded_when_vector_store_errors(self, client, mock_app_state):
+        """A vector-store error must make overall health degraded."""
+        mock_app_state.vector_store.get_collection_stats.side_effect = RuntimeError(
+            "ChromaDB unavailable"
+        )
+
+        response = client.get("/api/v1/health")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "degraded"
+        assert data["checks"]["vector_store"] == "error: ChromaDB unavailable"

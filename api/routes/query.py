@@ -264,7 +264,11 @@ async def health_check() -> dict:
     except Exception as e:
         checks["vector_store"] = f"error: {e}"
 
-    status = "healthy" if all(v not in ("MISSING", ) for v in checks.values()) else "degraded"
+    component_statuses = (checks["api"], checks["google_api_key"], checks["vector_store"])
+    status = "healthy" if all(
+        component_status in ("ok", "configured")
+        for component_status in component_statuses
+    ) else "degraded"
     return {"status": status, "checks": checks, "version": settings.APP_VERSION}
 
 
